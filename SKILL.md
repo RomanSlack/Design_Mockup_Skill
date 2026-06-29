@@ -1,6 +1,6 @@
 ---
 name: imagegen
-description: Generate or edit images by calling a local CLI that fronts OpenAI (gpt-image-2 / gpt-image-1.5) and Google Gemini (gemini-3-pro-image / "Nano Banana Pro"). Use when you need to actually PRODUCE image files — generate, create, render, or batch-produce mockups, UI screens, icons, product shots, hero/marketing images, illustrations; edit/recolor an existing image; make a transparent-background icon; or generate many on-brand images at once with monitoring. This is the tool to call when the user wants images made (not just prompts authored — for prompt-writing use image-prompts).
+description: Generate or edit images by calling a local CLI that fronts OpenAI (gpt-image-2 / gpt-image-1.5) and Google Gemini (gemini-3.1-flash-image "Nano Banana 2" default, gemini-3-pro-image "Nano Banana Pro" via --model pro). Use when you need to actually PRODUCE image files — generate, create, render, or batch-produce mockups, UI screens, icons, product shots, hero/marketing images, illustrations; edit/recolor an existing image; make a transparent-background icon; or generate many on-brand images at once with monitoring. This is the tool to call when the user wants images made (not just prompts authored — for prompt-writing use image-prompts).
 ---
 
 # imagegen
@@ -34,25 +34,27 @@ stdout is ALWAYS one JSON object — parse it. Live progress goes to **stderr** 
 
 Single result:
 ```json
-{"ok": true, "provider": "gemini", "model": "gemini-3-pro-image", "images": ["outputs/..._0.webp"], "cost_usd": 0.134, "errors": []}
+{"ok": true, "provider": "gemini", "model": "gemini-3.1-flash-image", "images": ["outputs/..._0.webp"], "cost_usd": 0.101, "errors": []}
 ```
 
 ## Picking the engine (`--provider`, default `auto`)
 
 | Want | Use | Why |
 |------|-----|-----|
-| photoreal scenes, hero/marketing shots, 4K, exact aspect ratios, multi-image consistency | **gemini** | `gemini-3-pro-image`, up to 14 reference images, native aspect ratios, `.webp` |
+| photoreal scenes, hero/marketing shots, fast + cheap, multi-image consistency | **gemini** (default) | `gemini-3.1-flash-image` (Nano Banana 2) — newest, ~half the price of Pro, up to 14 refs, `.webp` |
+| absolute top fidelity | **gemini `--model pro`** | `gemini-3-pro-image` (Nano Banana Pro) — highest quality, ~2× cost |
 | fixed pixel dimensions, edits/recolors | **openai** | `gpt-image-2`, exact `WxH` sizes, `.png` |
 | **transparent background** | **openai + `--transparent`** | auto-routes to `gpt-image-1.5` (gpt-image-2 can't do transparency) |
 
-`auto` routes to **openai** when you pass `--transparent`, a pixel `--size` (e.g. `1024x1024`), or `--edit`; otherwise **gemini**. When unsure, omit `--provider` and let auto decide, or pick gemini for "make it look good" scenes and openai for icons/edits.
+`auto` routes to **openai** when you pass `--transparent`, a pixel `--size` (e.g. `1024x1024`), or `--edit`; otherwise **gemini** (Nano Banana 2 by default). When unsure, omit `--provider` and let auto decide; reach for `--model pro` only when you need maximum fidelity and accept the higher cost.
 
 ## Flags
 
 | flag | engine | values |
 |------|--------|--------|
 | `--provider` | both | `auto` (default) / `openai` / `gemini` |
-| `--size` | both | openai: `1024x1024`, `1536x1024`, `1024x1536`, any `WxH` up to 4K, `auto` · gemini: `1K`, `2K`, `4K` |
+| `--model` | gemini | `2`/`flash` = Nano Banana 2 (default) · `pro` = Nano Banana Pro · or a full model id |
+| `--size` | both | openai: `1024x1024`, `1536x1024`, `1024x1536`, any `WxH` up to 4K, `auto` · gemini: `0.5K`, `1K`, `2K`, `4K` |
 | `--aspect` | gemini | `1:1 16:9 9:16 4:3 3:4 3:2 2:3 5:4 4:5 21:9` (default `16:9`) |
 | `--quality` | openai | `low` `medium` `high` (default) `auto` |
 | `--transparent` | openai | transparent background (→ gpt-image-1.5) |
@@ -70,10 +72,16 @@ Single result:
 python3 /home/roman/Design_Mockup_Skill/imagegen.py "a ceramic coffee cup by a window, soft morning light, photoreal"
 ```
 
-**4K vertical hero with an anchor image for consistency:**
+**4K vertical hero with an anchor image for consistency (Nano Banana 2 default):**
 ```
 python3 /home/roman/Design_Mockup_Skill/imagegen.py "product hero on rippling water" \
   --provider gemini --size 4K --aspect 9:16 --refs anchor.webp
+```
+
+**Max-fidelity version on Nano Banana Pro:**
+```
+python3 /home/roman/Design_Mockup_Skill/imagegen.py "product hero on rippling water" \
+  --provider gemini --model pro --size 4K --aspect 9:16 --refs anchor.webp
 ```
 
 **Transparent app icon:**
@@ -116,9 +124,9 @@ batch done: 2/2 ok, manifest -> outputs/batch_20260629_135021.json
 
 Batch stdout (one object):
 ```json
-{"ok": true, "count": 2, "succeeded": 2, "failed": 0, "total_cost_usd": 0.173,
+{"ok": true, "count": 2, "succeeded": 2, "failed": 0, "total_cost_usd": 0.312,
  "images": ["outputs/stone_0.webp", "outputs/mug_0.png"],
- "results": [{"ok": true, "provider": "...", "prompt": "...", "images": [...], "cost_usd": 0.134, "error": null}, ...],
+ "results": [{"ok": true, "provider": "...", "prompt": "...", "images": [...], "cost_usd": 0.101, "error": null}, ...],
  "manifest": "outputs/batch_20260629_135021.json", "errors": []}
 ```
 A failed item never aborts the run — it appears in `results` with `ok:false` + its `error`; run-level `ok` is true only if every item succeeded. To retry failures, build a new file from the `results` where `ok` is false.
@@ -130,7 +138,7 @@ Image generation costs real money per image, so the tool makes spend visible at 
 **Estimate before spending** — `--estimate` is a dry run that generates nothing and prints the projected cost. Always do this before a large or high-quality batch, and surface the number to the user:
 ```bash
 python3 /home/roman/Design_Mockup_Skill/imagegen.py "..." --provider gemini --size 4K -n 8 --estimate
-# -> {"ok": true, "estimate": true, "model": "gemini-3-pro-image", "n": 8, "per_image_usd": 0.24, "cost_usd": 1.92, ...}
+# -> {"ok": true, "estimate": true, "model": "gemini-3.1-flash-image", "n": 8, "per_image_usd": 0.151, "cost_usd": 1.208, ...}
 python3 /home/roman/Design_Mockup_Skill/imagegen.py batch prompts.jsonl --estimate
 # -> {"ok": true, "estimate": true, "count": 12, "cost_usd": 1.61, "items": [...]}
 ```
@@ -143,7 +151,7 @@ python3 /home/roman/Design_Mockup_Skill/imagegen.py cost
 # -> {"total_usd": ..., "today_usd": ..., "images": ..., "runs": ..., "by_model": {...}}
 ```
 
-Rough per-image guide (standard pricing; estimates): gemini 1K/2K ≈ **$0.13**, gemini 4K ≈ **$0.24**; gpt-image-2 1024² ≈ **$0.006 / $0.05 / $0.21** at low/medium/high; gpt-image-1.5 1024² high (transparent) ≈ **$0.13**. The exact table lives in `PRICING` in `imagegen.py`. These are estimates (providers bill by token); reference-image input cost is excluded.
+Rough per-image guide (standard pricing; estimates): gemini **Nano Banana 2** (default) 1K/2K/4K ≈ **$0.067 / $0.10 / $0.15**; gemini **Pro** (`--model pro`) 1K/2K ≈ **$0.13**, 4K ≈ **$0.24**; gpt-image-2 1024² ≈ **$0.006 / $0.05 / $0.21** at low/medium/high; gpt-image-1.5 1024² high (transparent) ≈ **$0.13**. The exact table lives in `PRICING` in `imagegen.py`. These are estimates (providers bill by token); reference-image input cost is excluded.
 
 ## Consistency across a set (the anchor workflow)
 

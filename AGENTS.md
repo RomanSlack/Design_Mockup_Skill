@@ -18,5 +18,6 @@ model). Both providers also offer a true async **Batch API** — JSONL upload, ~
 - **OpenAI Batch** supports `/v1/images/generations` + `/v1/images/edits`, but the supported
   model list names `gpt-image-1.5` / `gpt-image-1` / `gpt-image-1-mini` / `chatgpt-image-latest`
   — **not** `gpt-image-2`. Reference images must be passed as `file_id`/`image_url`, not multipart.
-- **Gemini Batch** supports `gemini-3-pro-image`; submit inline (≤20MB) or a JSONL file via the
-  File API (≤2GB). ~50% cheaper, 24h target.
+- **Gemini Batch** supports `gemini-3.1-flash-image` (Nano Banana 2, the default) and
+  `gemini-3-pro-image`; submit inline (≤20MB) or a JSONL file via the File API (≤2GB).
+  ~50% cheaper, 24h target.

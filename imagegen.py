@@ -44,7 +44,15 @@ OUTPUT_DIR = ROOT / "outputs"
 
 OPENAI_MODEL = "gpt-image-2"
 OPENAI_TRANSPARENT_MODEL = "gpt-image-1.5"   # gpt-image-2 can't do transparent bg
-GEMINI_MODEL = "gemini-3-pro-image"          # GA id (was gemini-3-pro-image-preview)
+GEMINI_MODEL = "gemini-3.1-flash-image"      # Nano Banana 2 — newest, default
+GEMINI_PRO_MODEL = "gemini-3-pro-image"      # Nano Banana Pro — highest fidelity
+
+# --model aliases (gemini); full ids pass through unchanged.
+GEMINI_ALIASES = {
+    "2": GEMINI_MODEL, "nb2": GEMINI_MODEL, "flash": GEMINI_MODEL,
+    "nano-banana-2": GEMINI_MODEL,
+    "pro": GEMINI_PRO_MODEL, "nbpro": GEMINI_PRO_MODEL, "nano-banana-pro": GEMINI_PRO_MODEL,
+}
 
 OPENAI_DEFAULT_SIZE = "1024x1024"
 GEMINI_DEFAULT_SIZE = "2K"
@@ -65,6 +73,7 @@ PRICING = {
         "1536x1024": {"low": 0.013, "medium": 0.050, "high": 0.199},
         "1024x1536": {"low": 0.013, "medium": 0.051, "high": 0.200},
     },
+    "gemini-3.1-flash-image": {"0.5K": 0.045, "1K": 0.067, "2K": 0.101, "4K": 0.151},
     "gemini-3-pro-image": {"1K": 0.134, "2K": 0.134, "4K": 0.240},
 }
 
@@ -118,7 +127,7 @@ def save_image(pil: PILImage.Image, slug: str, idx: int, meta: dict, ext: str) -
 
 # ── spec: a single normalized generation request ─────────────────────────────
 
-DEFAULTS = dict(provider="auto", size=None, aspect=None, quality="high",
+DEFAULTS = dict(provider="auto", model=None, size=None, aspect=None, quality="high",
                 transparent=False, refs=(), edit=(), n=1, name=None)
 
 
@@ -139,7 +148,10 @@ def resolve_provider(spec) -> str:
 
 def resolve_model(spec, provider) -> str:
     if provider == "gemini":
-        return GEMINI_MODEL
+        m = (spec.get("model") or "").lower()
+        if m.startswith("gemini-"):
+            return m
+        return GEMINI_ALIASES.get(m, GEMINI_MODEL)
     return OPENAI_TRANSPARENT_MODEL if spec["transparent"] else OPENAI_MODEL
 
 
@@ -233,6 +245,7 @@ def run_gemini(spec):
     if not os.getenv("GOOGLE_API_KEY"):
         raise RuntimeError("GOOGLE_API_KEY not set")
     client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    model = resolve_model(spec, "gemini")
     size = spec["size"] or GEMINI_DEFAULT_SIZE
     aspect = spec["aspect"] or GEMINI_DEFAULT_ASPECT
 
@@ -241,13 +254,13 @@ def run_gemini(spec):
     for p in sources:
         contents.append(PILImage.open(p))
 
-    meta = {"prompt": spec["prompt"], "model": GEMINI_MODEL, "provider": "gemini",
+    meta = {"prompt": spec["prompt"], "model": model, "provider": "gemini",
             "size": size, "aspect_ratio": aspect, "refs": [str(p) for p in sources]}
     slug = slugify(spec["name"] or spec["prompt"])
     saved = []
     for _ in range(spec["n"]):   # Gemini returns one image per call
         resp = client.models.generate_content(
-            model=GEMINI_MODEL,
+            model=model,
             contents=contents,
             config=types.GenerateContentConfig(
                 response_modalities=["IMAGE"],
@@ -261,7 +274,7 @@ def run_gemini(spec):
         for part in imgs:
             pil = PILImage.open(io.BytesIO(part.inline_data.data))
             saved.append(save_image(pil, slug, len(saved), meta, "webp"))
-    return saved, GEMINI_MODEL
+    return saved, model
 
 
 def run_one(spec) -> dict:
@@ -373,7 +386,8 @@ def cost_report() -> dict:
 
 def add_common(ap):
     ap.add_argument("--provider", choices=["auto", "openai", "gemini"], default="auto")
-    ap.add_argument("--size", help="openai: 1024x1024|1536x1024|1024x1536|<WxH up to 4K>|auto ; gemini: 1K|2K|4K")
+    ap.add_argument("--model", help="gemini model: 2|flash (Nano Banana 2, default) | pro (Nano Banana Pro) | full id")
+    ap.add_argument("--size", help="openai: 1024x1024|1536x1024|1024x1536|<WxH up to 4K>|auto ; gemini: 0.5K|1K|2K|4K")
     ap.add_argument("--aspect", help="gemini: 1:1 16:9 9:16 4:3 3:4 3:2 2:3 5:4 4:5 21:9 (default 16:9)")
     ap.add_argument("--quality", default="high", help="openai: low|medium|high|auto")
     ap.add_argument("--transparent", action="store_true", help="transparent bg (routes to gpt-image-1.5)")
@@ -386,7 +400,7 @@ def add_common(ap):
 
 
 def cli_defaults(args) -> dict:
-    return dict(provider=args.provider, size=args.size, aspect=args.aspect,
+    return dict(provider=args.provider, model=args.model, size=args.size, aspect=args.aspect,
                 quality=args.quality, transparent=args.transparent,
                 refs=args.refs, edit=args.edit, n=args.n)
 
