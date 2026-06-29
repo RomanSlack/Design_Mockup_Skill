@@ -46,7 +46,21 @@ Single result:
 | fixed pixel dimensions, edits/recolors | **openai** | `gpt-image-2`, exact `WxH` sizes, `.png` |
 | **transparent background** | **openai + `--transparent`** | auto-routes to `gpt-image-1.5` (gpt-image-2 can't do transparency) |
 
-`auto` routes to **openai** when you pass `--transparent`, a pixel `--size` (e.g. `1024x1024`), or `--edit`; otherwise **gemini** (Nano Banana 2 by default). When unsure, omit `--provider` and let auto decide; reach for `--model pro` only when you need maximum fidelity and accept the higher cost.
+`auto` routes to **openai** when you pass `--transparent`, a pixel `--size` (e.g. `1024x1024`), or `--edit`; otherwise **gemini** (Nano Banana 2 by default). When unsure, omit `--provider` and let auto decide.
+
+### Which Gemini model: Nano Banana 2 vs Pro
+
+Default to **Nano Banana 2** (`gemini-3.1-flash-image`). It's newest, fast, ~half the cost, and good enough for almost everything. Use it for:
+- drafting and iteration (you'll regenerate a few times — keep it cheap),
+- batches and bulk sets,
+- anything 1K/2K, and most 4K.
+
+Switch to **`--model pro`** (`gemini-3-pro-image`) only for a **final, hero-quality** image where fidelity matters most, specifically:
+- dense or legible **text / typography** in the image (Pro renders text more reliably),
+- fine detail, complex lighting, or many subjects needing **identity consistency**,
+- the one keeper you'll actually ship, after iterating cheaply on NB2.
+
+Rule of thumb: **iterate on NB2, finalize on Pro** when the result has to be pixel-perfect. Pro costs ~2× per image, so don't use it for drafts or large batches. (The README banner used Pro for exactly this reason — it had legible title text.)
 
 ## Flags
 
